@@ -1,5 +1,3 @@
-```kotlin
-
 tasks.named<BootBuildImage>("bootBuildImage") {
 println("--------------")
 println(properties["docker_pw"] as String)
@@ -20,7 +18,11 @@ println("--------------")
 // 패스워드의 특수문자(! 등)는 \를 붙인다.
 
 // docker images rm 이미지명
+<<<<<<< HEAD
 // docker pull 이미지명
 
-
+```
+=======
+// docker pull 이미지명
+>>>>>>> 502ddd5eafcc203753e82ad9686b17e1242daef4
 ```
