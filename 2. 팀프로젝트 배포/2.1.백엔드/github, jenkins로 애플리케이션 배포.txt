@@ -1,0 +1,151 @@
+
+===== 젠킨스 서버 설치 및 실행(우분투) ===== 
+
+** default-jre가 설치되어 있어야 한다.
+sudo apt-get install default-jre
+
+-- 설치
+wget -q -O - https://pkg.jenkins.io/debian/jenkins.io.key | sudo apt-key add -
+sudo sh -c 'echo deb http://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
+sudo apt-get update
+sudo apt-get install jenkins
+
+
+-- 실행
+sudo service jenkins start (종료는 stop)
+
+
+-- 브라우저에서 관리자 화면 접속
+http://젠킨스를 설치한 서버주소:8080
+  - 기본적으로 8080이다. 
+  - 다른 애플리케이션이 8080으로 실행중이면 해당 애플리케이션 종료 후에 실행
+  - /etc/default/jenkins 디렉토리의 설정파일을 수정하여 포트를 변경 가능
+
+
+-- unlock jenkins
+화면에 보이는 파일을 sudo cat 명령어로 확인하여 카피한 후 복사
+
+
+-- customize jenkins
+Select plugins to install 선택한 후 아래의 플러그인만 선택하고 나머지는 선택 해제
+Folders, OWASP Markup, Build Timeout, Credentials Binding, Timestamper, Workspace Cleanup, 
+Gradle, Git, GitHub, Publish Over SSH
+
+
+-- create first admin user
+관리자 계정 생성
+
+
+-- 보안설정 변경(github에서 빌드요청을 보낼 수 있도록)
+. Manage Jenkins(Jenkins 관리) -> Configure Global Security
+
+. CSRF Protection - Prevent Cross Site Request Forgery exploits 체크 해제
+
+. 저장
+
+
+
+===== 젠킨스 환경구성 ===== 
+
+-- SSH Server 등록
+. Manage Jenkins(Jenkins 관리) -> Configure System(시스템 설정)
+
+. 하단에 Publish over SSH 란에 추가를 클릭하여 설정 추가
+  - SSH Server Name - 프로젝트명-서비스명
+  - Hostname - ec2-xxxx.xxxxx.compute.amazonaws.com (http:// 제외)
+  - Username - ubuntu
+  - Remote Directory - /home/ubuntu/[스프링앱이 배포될 경로] <- 디렉토리는 생성되어 있어야함
+  - 고급(Advanced) 클릭
+  - Use password authentication, or use a different key 체크
+  - Key 에 xxx.pem 파일 내용 복사
+  
+. Test Configuration을 클릭하여 테스트, Success가 뜨면 정상 접속  
+
+. 저장
+ 
+
+===== 젠킨스 빌드 및 배포 작업 만들기(Job) =====
+. New Item(새로운 Item) -> Freestyle project -> Job 이름입력: 예) 프로젝트명-서비스명
+
+. General 탭
+  - GitHub project 체크 및 프로젝트 주소 입력 (.git 없는 경로) 예) https://github.com/javaap2020/myworkspace
+
+. 소스 코드 관리 탭
+  - git > Repositories URL입력, 예) https://github.com/javaap2020/myworkspace.git
+  - Credentials에 Add 클릭 > Jenkins > Github의 username, password 입력
+  - Branches to build > */브랜치명
+
+. 빌드 유발
+  - GitHub hook trigger for GITScm polling 체크
+
+. 빌드 환경
+  - Delete workspace before build starts 체크
+  - Add timestamps to the Console Output 체크
+
+. Build 탭
+  - Add build step > Invoke Gradle script
+  - Use Gradle Wrapper 선택, Make gradlew executable에 체크
+  - Tasks에 clean build 입력
+
+. 빌드 후 조치
+  - 빌드 후 조치 추가>Send build artifacts over SSH
+  - 앞쪽에서 환경 구성한 SSH Server 선택
+  - Source files에 build/libs/*.jar 입력
+  - Remove prefix에 build/libs 입력
+  - Exec command에 배포후 실행할 스크립트 입력
+    예) sudo sh /home/ubuntu/app/run.sh /home/ubuntu/app/myworkspace > /dev/null 2> /dev/null 
+                                                          -> 실행디렉토리/spring 프로젝트명
+        ->
+  
+. 저장
+  
+  
+
+===== Github에 WebHook 설정 =====
+
+. 리포지토리 > Settings > Webhooks
+
+. Payload URL에 아래와 같이 입력
+  http://젠킨스서버주소:포트/github-webhook/
+
+. Content type
+  application/x-www-form-urlencoded
+  
+. Which events would you like to trigger this webhook?
+  Just the push event 선택
+
+. 저장
+
+** 중요
+. 리포지토리 > Settings > Webhooks에서 추가한 내용이 녹색으로 체크인지 확인하여
+. 녹색이 아니면 클릭해서 들어간 후 Recent Deliveries를 확인
+. 응답을 확인한 후 오류를 수정하였으면 Redeliver를 눌러서 다시 요청을 보내고 200/201코드로 되는지 확인한다
+
+
+
+===== 젠키스 작업 실행 확인 =====
+. 젠킨스 대시보드에 해당 작업 클릭
+
+. Build History에 작업 진행중이거나 종료되었는지 확인
+
+. 해당 빌드 항목을 클릭하여 상세화면으로 들어간 후 Console Output을 확인하여 정상적으로 처리되는지 확인
+
+. 해당 스프링 앱을 브라우저나 테스트 도구로 실행하여 정상적으로 실행되었는지 확인한다.
+
+
+
+===== 젠킨스 삭제 =====
+sudo service jenkins stop
+sudo apt-get remove jenkins --purge
+sudo rm /etc/apt/sources.list.d/jenkins.list
+
+
+
+-- 우분투에 젠킨스 설치
+http://www.fun25.co.kr/blog/jenkins-ubuntu-16-04-install/?page=6
+
+-- [Spring] Jenkins(젠킨스)를 활용한 스프링부트 앱 간단 배포하기
+https://pjh3749.tistory.com/261
+
+-- Github의 WebHook을 이용하여 자동 Jenkins Job 실행
+https://taetaetae.github.io/2018/02/08/github-web-hook-jenkins-job-excute/

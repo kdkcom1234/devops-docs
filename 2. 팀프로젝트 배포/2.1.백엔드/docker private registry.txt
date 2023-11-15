@@ -1,0 +1,88 @@
+
+-- 도커 설치(우분투)
+sudo apt update
+sudo apt install apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
+sudo apt update
+apt-cache policy docker-ce
+
+sudo apt install docker-ce
+
+sudo systemctl status docker
+
+
+
+===== 도커 레지스트리 서버 =====
+1. 도커 설치
+
+2. registry 이미지 받고 실행(레지스트리를 웹서비스로 관리해줌)
+sudo docker pull registry
+sudo docker run -dit --name docker-registry -p 5000:5000 registry
+
+3. 레지스트리 접속 확인
+curl http://레지스트리서버ip:5000/v2/_catalog
+
+
+===== 빌드 서버(젠킨스) =====
+1. 도커 설치
+
+2. insecure registry 등록
+     /etc/docker/daemon.json 파일에
+	{
+		"insecure-registries": ["레지스트리아이피:포트"]
+	}
+	
+3. /etc/sudoers에 젠킨스 추가	
+jenkins ALL=(ALL) NOPASSWD: ALL
+
+4. 젠킨스 관리 > 시스템 구성에 SSH remote hosts 추가
+  Hostname: 스프링 애플리케이션이 구동될 서버주소
+  Port: 22
+  Credentials: Add(Jenkins)-> SSH Username with private key
+	Username: ubuntu
+	Private Key: Enter directly 체크 후, 키파일.pem의 내용을 복사 붙여넣기
+		
+5. Gradle 빌드 후 스텝 추가(Execute Shell) 
+sudo docker build -t 이미지태그명(서비스명) .                  		// 이미지 빌드
+sudo docker tag 이미지태그명 레지스트리아이피:포트/이미지태그명		// 이미지 태그 추가
+sudo docker push 레지스트리아이피:포트/이미지태그명					// registry로 이미지 푸시
+sudo docker rmi 이미지태그명										// 이미지 삭제
+sudo docker rmi 레지스트리아이피:포트/이미지태그명					// 이미지 삭제
+
+ 
+6. 빌드 환경에 Excute shell script on remote host using ssh 체크
+  위에서 등록한 SSH remote hosts 선택(SSH site)
+  Post build script에 아래 스크립트 작성
+	sudo docker pull 레지스트리아이피:포트/이미지태그명										// 레지스트리에서 이미지 가져오기
+	sudo docker kill 컨테이너이름															// 기존 컨테이너 종료
+	sudo docker rm 컨테이너이름																// 기존 컨테이너 제거
+	sudo docker run --name 컨테이너이름 -d -p 9090:9090 레지스트리아이피:포트/이미지태그명	// 컨테이너 실행
+
+
+
+===== 서비스 서버 =====
+1. 도커 설치
+
+2. insecure registry 등록
+
+
+
+-- 도커 로그 확인
+sudo docker logs -f 컨테이너이름
+
+
+-- 도커 컨테이너 및 빌드 캐시 초기화
+sudo docker system prune -a
+
+
+-- 도커 삭제
+sudo systemctl stop docker
+sudo apt purge docker-ce
+sudo rm -rf /var/lib/docker
+
+
+// 도커 private registry
+https://novemberde.github.io/2017/04/09/Docker_Registry_0.html
+// 도커 설치(우분투)
+https://blog.cosmosfarm.com/archives/248/%EC%9A%B0%EB%B6%84%ED%88%AC-18-04-%EB%8F%84%EC%BB%A4-docker-%EC%84%A4%EC%B9%98-%EB%B0%A9%EB%B2%95/
