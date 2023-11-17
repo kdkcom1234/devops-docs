@@ -10,4 +10,4 @@ else
 fi
 
 echo "> run the [$1] app"
-nohup java -jar -Dspring.profiles.active=prod `ls $1*.jar` >> "$1.log" &
+nohup java -jar -Dspring.profiles.active=dev `ls $1*.jar` >> "$1.log" 2>> "$1.err" &
